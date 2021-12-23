@@ -1,0 +1,246 @@
+##SCORE board
+from heapq import *
+import random
+global directs
+di = [(1,0), (0,1), (1,-1), (1,1)]
+
+
+
+
+
+def make_cells(board):
+    cells = [[],[],[],[]]
+
+    # Vertical
+    for x in range(8):
+        for start_y in range(0,4):
+            set = []
+            for y in range(5):
+                set.append(board[start_y + y][x])
+            if(set != [" "," "," "," "," "] and (set.count("b") == 0 or set.count("w") == 0)):
+                set = set + [start_y, x, 0]
+                cells[0].append(set)
+    # Horrizontal
+    for y in range(8):
+        for start_x in range(0,4):
+            set = []
+            for x in range(5):
+                set.append(board[y][start_x + x])
+            if(set != [" "," "," "," "," "] and (set.count("b") == 0 or set.count("w") == 0)):
+                set = set + [y, start_x, 1]
+                cells[1].append(set)
+    # /
+    for x in range(4, 8):
+        for start_x in range(0, x-3):
+            set = []
+            for i in range(5):
+                set.append(board[i+start_x][x-start_x-i])
+            if(set != [" "," "," "," "," "] and (set.count("b") == 0 or set.count("w") == 0)):
+                set = set + [start_x, x - start_x, 2]
+                cells[2].append(set)
+    for y in range(1, 4):
+        for start_y in range(0, 4-y):
+            set = []
+            for i in range(5):
+                set.append(board[y + start_y + i][7-start_y -i])
+            if(set != [" "," "," "," "," "] and (set.count("b") == 0 or set.count("w") == 0)):
+                set = set + [ y + start_y, 7-start_y, 2]
+                cells[2].append(set)
+    # \
+
+    for x in range(3, -1, -1):
+        for start_x in range(0, 4-x):
+            set = []
+            for i in range(5):
+                set.append(board[i+start_x][x+start_x+i])
+            if(set != [" "," "," "," "," "] and (set.count("b") == 0 or set.count("w") == 0)):
+                set = set + [start_x, x + start_x, 3]
+                cells[3].append(set)
+    for y in range(1, 4):
+        for start_y in range(0, 4-y):
+            set = []
+            for i in range(5):
+                set.append(board[y + start_y + i][start_y + i])
+            if(set != [" "," "," "," "," "] and (set.count("b") == 0 or set.count("w") == 0)):
+                set = set + [y + start_y, start_y, 3]
+                cells[3].append(set)
+    return cells
+
+
+
+################################################################################
+def seq_with(y,x, cells):
+    ans = []
+
+    for ver in cells[0]:
+       if(x == ver[-2] and y >= ver[-3] and y < ver[-3] + 5 ):
+           ans.append(ver)
+    for hor in cells[1]:
+       if(y == hor[-3] and x >= hor[-2] and x < hor[-2] + 5 ):
+           ans.append(hor)
+    for tr in cells[2]:
+        dn = y - tr[-3]
+        if(dn >= 0 and dn < 5 and dn == tr[-2] - x):
+            ans.append(tr)
+    for tl in cells[3]:
+        dn = y - tl[-3]
+        if(dn >= 0 and dn < 5 and dn == x - tl[-2]):
+            ans.append(tl)
+    return ans
+
+
+global cofs
+cofs = [187.5, 200.0, 0.0, 0.0075, 187.5, 0.5, 100, 45]
+#cofs = [187.5, 200.0, 0.0, 0.0075, 187.5, 0.5, 150, 45]
+def value1(gains, supers):
+    return(( cofs[0] * gains[0][3] +
+             cofs[1] * gains[0][2] +
+             cofs[2] * gains[0][1] +
+             cofs[3] * gains[1][3] +
+             cofs[4] * gains[1][2] +
+             cofs[5] * gains[1][1] +
+             cofs[6] * supers[0][3] +
+             cofs[7] * supers[1][3]
+    )/100)
+
+
+def cpy_brd(brd):
+    ans = []
+    for i in brd:
+        ans.append(i.copy())
+    return ans
+
+
+
+
+
+def score_from_cells(y,x, cells, col, board):
+    cells_in = seq_with(y,x, cells)
+    gains = [{1:0, 2:0, 3:0}, {1:0, 2:0, 3:0}]
+    supers = [{3:0},{3:0}]
+    score = []
+
+    for cell in cells_in:
+        t = cell.count(col)
+        e = cell.count(" ")
+        if t == 4:
+            return [[100], 100]
+        if e == 1:
+            score = [99]
+        else:
+            gains[t == 0][5 - e] += 1
+            if(5 - e == 2):
+                a = is_super(cell,y,x, board) # pos of own super
+                if(a):
+                    supers[t == 0][3] += 1
+
+    if(gains[0][3] >= 2):
+        score.append(98)
+    if(gains[0][3] == 1 and supers[0][3] >= 1):
+        score.append(97.5)
+    if(gains[1][3] >= 2 or (supers[1][3] >= 1 and gains[1][3] >= 1)):
+        score.append(97)
+    if(supers[0][3] >= 2):
+        score.append(96)
+    if(supers[1][3] >= 2):
+        score.append(95)
+
+    value = value1(gains, supers)
+
+    return [score, value]
+
+
+def in_indx(y, x):# returns if x, y is in range of brd
+    if(x >= 0 and y >= 0 and x < 8 and y < 8):
+        return True
+    return False
+
+
+
+def is_super(cell, y, x, board):
+    cell = cell.copy()
+    dy = y - cell[5]
+    dx = x - cell[6]
+    if(di[cell[7]][0] == 0):
+        dy = dx/di[cell[7]][1]
+    else:
+        dy = dy/di[cell[7]][0]
+    cell[int(dy)] = 't'
+
+
+    y_s, x_s = cell[5] -   di[cell[7]][0], cell[6] -   di[cell[7]][1]
+    y_e, x_e = cell[5] + 5*di[cell[7]][0], cell[6] + 5*di[cell[7]][1]
+
+    if(cell[0] != ' ' and cell[4] != ' '):
+        return False
+    if(cell[0] == ' ' and cell[4] == ' '):
+        if(in_indx(y_s, x_s) and board[y_s][x_s] == ' '):
+            return True
+        if(in_indx(y_e, x_e) and board[y_e][x_e] == ' '):
+            return True
+    elif(cell[0] != ' '):
+        if(in_indx(y_s, x_s) and board[y_s][x_s] == ' '):
+            return True
+    elif(cell[4] != ' '):
+        if(in_indx(y_e, x_e) and board[y_e][x_e] == ' '):
+            return True
+    return False
+
+
+def score_board(board, col, cells):
+    scoreMap = []
+
+    for y in range(8):
+        for x in range(8):
+            if(board[y][x] == ' '):
+                scoreMap.append([score_from_cells(y,x,cells,col, board), y, x])
+            else:
+                scoreMap.append([[[],-1], y,x])
+    return scoreMap
+
+
+
+
+################################################################################
+################################################################################
+def scoreMapBot(board, col):
+    cells = make_cells(board)
+    scoreMap = score_board(board, col, cells)
+
+    try:
+        best = scoreMap[0]
+    except:
+        return [[[0],0],0,0]
+    best = max(scoreMap)
+    if(best[0] > [[1],0]):
+        return(best)
+
+
+    # looks at score in nearby cells
+    top_five_to_check = nlargest(5, scoreMap)
+    ans = []
+    for move in top_five_to_check:
+        seq_in = seq_with(move[1],move[2],cells)
+        indxs = []
+        for cell in seq_in:
+            for i in range(5):
+                if(cell[i] == ' '):
+                    temp = (cell[5] + i * di[cell[7]][0] )*8 + cell[6] + i * di[cell[7]][1]
+                    if(temp not in indxs):
+                        indxs.append(temp)
+        arnd = 0
+        for i in indxs:
+            arnd += scoreMap[i][0][1]
+
+        move[0][0] = [move[0][1]]
+        move[0][1] = arnd
+        ans.append(move)
+
+    return max(ans)
+
+
+def move(board, col):
+    best = scoreMapBot(board, col)
+    return(best[1], best[2])
+
+
